@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>y=x^n과 y=a의 교점</title>
+
+    <!-- KaTeX (필기 영역용) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- MathJax (그래프 라벨용) - 자동 렌더링 비활성화 -->
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['\\(', '\\)']] },  // $는 KaTeX용으로 양보
+            svg: { fontCache: 'global' },
+            startup: {
+                typeset: false,  // 자동 렌더링 비활성화
+                ready: () => {
+                    MathJax.startup.defaultReady();
+                    initGraph();
+                }
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+        :root {
+            /* 기본 색상 */
+            --bg-color: #ffffff;
+            --axis-color: #4b5563;
+            --text-color: #374151;
+            --dash-color: #9ca3af;
+
+            /* 주 곡선: 진회색 */
+            --curve-color: #374151;
+
+            /* 보조선 색상 (우선순위: 빨-녹-파-노) */
+            --color-red: #dc2626;
+            --color-green: #16a34a;
+            --color-blue: #2563eb;
+            --color-yellow: #ca8a04;
+
+            /* y=a 색상 (a의 부호별) */
+            --line-positive: #dc2626;
+            /* a > 0: 빨강 */
+            --line-zero: #16a34a;
+            /* a = 0: 녹색 */
+            --line-negative: #2563eb;
+            /* a < 0: 파랑 */
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .main-card {
+            background: white;
+            padding: 32px 40px;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 720px;
+        }
+
+        /* 그래프 영역 */
+        .graph-wrapper {
+            position: relative;
+            width: 620px;
+            height: 500px;
+            margin-bottom: 10px;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* SVG 스타일 */
+        .axis {
+            stroke: var(--axis-color);
+            stroke-width: 1.5;
+        }
+
+        .curve {
+            stroke: var(--curve-color);
+            stroke-width: 3.5;
+            fill: none;
+            stroke-linecap: round;
+        }
+
+        .line-a {
+            stroke-width: 2.5;
+            stroke-linecap: round;
+        }
+
+        .line-a.positive {
+            stroke: var(--line-positive);
+        }
+
+        .line-a.zero {
+            stroke: var(--line-zero);
+        }
+
+        .line-a.negative {
+            stroke: var(--line-negative);
+        }
+
+        .dash-guide {
+            stroke: var(--dash-color);
+            stroke-width: 1.5;
+            stroke-dasharray: 6, 5;
+        }
+
+        /* 교점 (곡선 위) */
+        .point-intersection {
+            fill: white;
+            stroke-width: 2.5;
+        }
+
+        .point-intersection.positive {
+            stroke: var(--line-positive);
+        }
+
+        .point-intersection.zero {
+            stroke: var(--line-zero);
+        }
+
+        .point-intersection.negative {
+            stroke: var(--line-negative);
+        }
+
+        /* x축 위의 점 */
+        .point-axis {
+            fill: var(--curve-color);
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        /* 수식 라벨 */
+        .math-label {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            white-space: nowrap;
+            font-size: 1.1rem;
+            transition: top 0.1s linear, left 0.1s linear, opacity 0.2s;
+            z-index: 10;
+        }
+
+        .math-label.dynamic {
+            font-weight: 500;
+        }
+
+        /* 컨트롤 패널 */
+        .controls-panel {
+            width: 100%;
+            background: #f9fafb;
+            border-radius: 16px;
+            padding: 20px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-sizing: border-box;
+            margin-top: 16px;
+        }
+
+        /* N 선택기 */
+        .n-select-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .control-label {
+            text-align: center;
+        }
+
+        .control-label .title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 2px;
+        }
+
+        .control-label .big-letter {
+            font-family: 'Times New Roman', serif;
+            font-size: 2.8rem;
+            font-style: italic;
+            color: var(--text-color);
+            line-height: 1;
+        }
+
+        .n-buttons {
+            display: flex;
+            background: white;
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .n-btn {
+            border: none;
+            background: transparent;
+            width: 38px;
+            height: 34px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #9ca3af;
+            font-family: 'Pretendard';
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .n-btn:hover {
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+
+        .n-btn.active {
+            background: var(--curve-color);
+            color: white;
+            box-shadow: 0 2px 4px rgba(55, 65, 81, 0.3);
+        }
+
+        /* A 슬라이더 */
+        .a-control-area {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex: 1;
+            justify-content: flex-end;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 180px;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border: 2px solid #d1d5db;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: border-color 0.2s;
+        }
+
+        input[type=range]:focus::-webkit-slider-thumb {
+            border-color: var(--curve-color);
+        }
+
+        #valA {
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-size: 1.05rem;
+            font-weight: 600;
+            width: 50px;
+            text-align: right;
+            color: var(--text-color);
+        }
+
+        #valA.positive {
+            color: var(--line-positive);
+        }
+
+        #valA.zero {
+            color: var(--line-zero);
+        }
+
+        #valA.negative {
+            color: var(--line-negative);
+        }
+
+        /* 필기 영역 */
+        .note-section {
+            width: 100%;
+            margin-top: 20px;
+            padding: 20px 24px;
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            border-radius: 0 12px 12px 0;
+            box-sizing: border-box;
+        }
+
+        .note-section .note-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #b45309;
+            margin-bottom: 14px;
+        }
+
+        .note-item {
+            margin: 12px 0;
+            padding-left: 8px;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            color: #374151;
+        }
+
+        /* 하위 목록 */
+        .sub-list {
+            margin: 8px 0 0 20px;
+            padding: 0;
+            list-style: none;
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+
+        .sub-list li {
+            margin: 4px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .sub-list li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #9ca3af;
+        }
+
+        .note-item .case-label {
+            display: inline-block;
+            font-weight: 600;
+            min-width: 80px;
+        }
+
+        .note-item .case-label.odd {
+            color: var(--curve-color);
+        }
+
+        .note-item .case-label.even {
+            color: #7c3aed;
+        }
+
+        .note-item .highlight {
+            background: rgba(245, 158, 11, 0.2);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+
+        /* 범례 */
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed #e5e7eb;
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .legend-color.red {
+            background: var(--line-positive);
+        }
+
+        .legend-color.green {
+            background: var(--line-zero);
+        }
+
+        .legend-color.blue {
+            background: var(--line-negative);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="main-card">
+
+        <!-- 그래프 영역 -->
+        <div class="graph-wrapper" id="wrapper">
+            <svg viewBox="0 0 620 500">
+                <defs>
+                    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                        <path d="M0,0 L0,6 L9,3 z" fill="#4b5563" />
+                    </marker>
+                </defs>
+
+                <!-- 축 -->
+                <line x1="310" y1="480" x2="310" y2="20" class="axis" marker-end="url(#arrow)"></line>
+                <line x1="20" y1="250" x2="600" y2="250" class="axis" marker-end="url(#arrow)"></line>
+
+                <!-- 그래프 요소 -->
+                <path id="curvePath" class="curve"></path>
+                <line id="lineA" class="line-a"></line>
+
+                <!-- 교점 그룹 (양수 방향) -->
+                <g id="groupPos" style="opacity: 0;">
+                    <path id="dashPos" class="dash-guide"></path>
+                    <circle id="ptAxisPos" class="point-axis" r="5"></circle>
+                    <circle id="ptPos" class="point-intersection" r="6"></circle>
+                </g>
+
+                <!-- 교점 그룹 (음수 방향, 짝수 n용) -->
+                <g id="groupNeg" style="opacity: 0;">
+                    <path id="dashNeg" class="dash-guide"></path>
+                    <circle id="ptAxisNeg" class="point-axis" r="5"></circle>
+                    <circle id="ptNeg" class="point-intersection" r="6"></circle>
+                </g>
+            </svg>
+
+            <!-- 정적 라벨 (MathJax) -->
+            <div class="math-label" style="left: 325px; top: 22px;">\(y\)</div>
+            <div class="math-label" style="left: 598px; top: 238px;">\(x\)</div>
+            <div class="math-label" style="left: 295px; top: 268px; font-size: 1rem;">O</div>
+            <div id="labelCurve" class="math-label"
+                style="left: 520px; top: 55px; color: var(--curve-color); font-weight:600;">\(y = x^n\)</div>
+
+            <!-- 동적 라벨 (MathJax) -->
+            <div id="labelLineA" class="math-label dynamic">\(y = a\)</div>
+            <div id="labelRootPos" class="math-label dynamic"></div>
+            <div id="labelRootNeg" class="math-label dynamic"></div>
+
+            <!-- y축 a 위치 라벨 -->
+            <div id="labelAxisA" class="math-label dynamic" style="font-size: 0.95rem;">\(a\)</div>
+        </div>
+
+        <!-- 컨트롤 패널 -->
+        <div class="controls-panel">
+            <div class="n-select-area">
+                <div class="control-label">
+                    <div class="title">차수</div>
+                    <div class="big-letter">n</div>
+                </div>
+                <div class="n-buttons">
+                    <button class="n-btn" data-n="2">2</button>
+                    <button class="n-btn active" data-n="3">3</button>
+                    <button class="n-btn" data-n="4">4</button>
+                    <button class="n-btn" data-n="5">5</button>
+                </div>
+            </div>
+
+            <div class="a-control-area">
+                <div class="control-label">
+                    <div class="title">값 조절</div>
+                    <div class="big-letter">a</div>
+                </div>
+                <input type="range" id="sliderA" min="-4.5" max="4.5" step="0.1" value="2">
+                <div id="valA">2.0</div>
+            </div>
+        </div>
+
+        <!-- 범례 -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color red"></div>
+                <span>$a > 0$</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color green"></div>
+                <span>$a = 0$</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color blue"></div>
+                <span>$a < 0$</span>
+            </div>
+        </div>
+
+        <!-- 필기 영역 -->
+        <div class="note-section">
+            <div class="note-title">📝 $a$의 $n$제곱근의 개수</div>
+
+            <div class="note-item">
+                <span class="case-label odd">$n$이 홀수:</span>
+                $a$의 $n$제곱근 중 <span class="highlight">실수인 것은 오직 하나</span> (부호는 $a$와 같음)
+            </div>
+
+            <div class="note-item">
+                <span class="case-label even">$n$이 짝수:</span>
+                $a$의 $n$제곱근의 개수는 $a$의 부호에 따라 달라짐
+                <ul class="sub-list">
+                    <li>$a > 0$ → <span class="highlight">2개</span> ($\pm\sqrt[n]{a}$)</li>
+                    <li>$a = 0$ → <span class="highlight">1개</span> (0)</li>
+                    <li>$a < 0$ → <span class="highlight">0개</span> (실수 없음)</li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 설정값
+        let n = 3;
+        const width = 620, height = 500;
+        const cx = 310, cy = 250;
+        const scaleX = 50, scaleY = 50;
+
+        // 요소 참조
+        const curvePath = document.getElementById('curvePath');
+        const lineA = document.getElementById('lineA');
+        const sliderA = document.getElementById('sliderA');
+        const displayA = document.getElementById('valA');
+
+        const groupPos = document.getElementById('groupPos');
+        const ptPos = document.getElementById('ptPos');
+        const ptAxisPos = document.getElementById('ptAxisPos');
+        const dashPos = document.getElementById('dashPos');
+
+        const groupNeg = document.getElementById('groupNeg');
+        const ptNeg = document.getElementById('ptNeg');
+        const ptAxisNeg = document.getElementById('ptAxisNeg');
+        const dashNeg = document.getElementById('dashNeg');
+
+        const labelLineA = document.getElementById('labelLineA');
+        const labelRootPos = document.getElementById('labelRootPos');
+        const labelRootNeg = document.getElementById('labelRootNeg');
+        const labelAxisA = document.getElementById('labelAxisA');
+        const labelCurve = document.getElementById('labelCurve');
+
+        const btns = document.querySelectorAll('.n-btn');
+
+        // 좌표 변환
+        const toPx = (x, y) => ({ x: cx + x * scaleX, y: cy - y * scaleY });
+
+        // 초기화
+        function initGraph() {
+            // 그래프 영역 내 모든 MathJax 라벨 초기 렌더링
+            const graphWrapper = document.querySelector('.graph-wrapper');
+            MathJax.typesetPromise([graphWrapper]).then(() => {
+                updateMathLabels();
+                updateGraph();
+            });
+
+            sliderA.addEventListener('input', updateGraph);
+
+            btns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    n = parseInt(btn.dataset.n);
+                    btns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    updateMathLabels();
+                    updateGraph();
+                });
+            });
+        }
+
+        // n 변경 시 수식 라벨 업데이트 (MathJax)
+        function updateMathLabels() {
+            labelCurve.innerHTML = `\\(y = x^{${n}}\\)`;
+            MathJax.typesetPromise([labelCurve]);
+        }
+
+        // 부호에 따른 색상 클래스
+        function getSignClass(a) {
+            if (Math.abs(a) < 0.05) return 'zero';
+            return a > 0 ? 'positive' : 'negative';
+        }
+
+        // 색상 CSS 변수
+        function getLineColor(a) {
+            if (Math.abs(a) < 0.05) return 'var(--line-zero)';
+            return a > 0 ? 'var(--line-positive)' : 'var(--line-negative)';
+        }
+
+        // 메인 업데이트
+        function updateGraph() {
+            const a = parseFloat(sliderA.value);
+            const signClass = getSignClass(a);
+            const lineColor = getLineColor(a);
+
+            // 값 표시 업데이트
+            displayA.innerText = a.toFixed(1);
+            displayA.className = signClass;
+
+            // 1. y=x^n 곡선
+            let d = "";
+            let started = false;
+            for (let x = -5.5; x <= 5.5; x += 0.03) {
+                let y;
+                if (n % 2 === 0) {
+                    y = Math.pow(Math.abs(x), n);
+                } else {
+                    y = x >= 0 ? Math.pow(x, n) : -Math.pow(-x, n);
+                }
+
+                let px = toPx(x, y);
+                if (px.y > -20 && px.y < height + 20) {
+                    if (!started) {
+                        d += `M${px.x.toFixed(1)},${px.y.toFixed(1)}`;
+                        started = true;
+                    } else {
+                        d += `L${px.x.toFixed(1)},${px.y.toFixed(1)}`;
+                    }
+                }
+            }
+            curvePath.setAttribute("d", d);
+
+            // 2. y=a 직선
+            let py = toPx(0, a).y;
+            lineA.setAttribute("x1", 20);
+            lineA.setAttribute("y1", py);
+            lineA.setAttribute("x2", 600);
+            lineA.setAttribute("y2", py);
+            lineA.className.baseVal = `line-a ${signClass}`;
+
+            // y=a 라벨 위치 및 색상
+            labelLineA.style.left = `565px`;
+            labelLineA.style.top = `${py - 22}px`;
+            labelLineA.style.color = lineColor;
+
+            // y축 a 위치 라벨
+            labelAxisA.style.left = `290px`;
+            labelAxisA.style.top = `${py}px`;
+            labelAxisA.style.color = lineColor;
+            labelAxisA.style.opacity = Math.abs(a) < 0.05 ? '0' : '1';
+
+            // 3. 교점 처리
+            const isEven = (n % 2 === 0);
+            const isZero = Math.abs(a) < 0.05;
+
+            // 짝수차수이고 a가 음수면 교점 없음
+            if (isEven && a < 0) {
+                groupPos.style.opacity = 0;
+                groupNeg.style.opacity = 0;
+                labelRootPos.style.opacity = 0;
+                labelRootNeg.style.opacity = 0;
+                return;
+            }
+
+            // x좌표 계산
+            let xVal;
+            if (isZero) {
+                xVal = 0; // a=0이면 정확히 0
+            } else if (isEven) {
+                xVal = Math.pow(Math.abs(a), 1 / n);
+            } else {
+                xVal = a >= 0 ? Math.pow(a, 1 / n) : -Math.pow(-a, 1 / n);
+            }
+
+            // 양수(또는 유일한) 교점
+            let p1 = toPx(xVal, a);
+            let axis1 = toPx(xVal, 0);
+
+            groupPos.style.opacity = 1;
+
+            // 교점 (곡선 위)
+            ptPos.setAttribute("cx", p1.x);
+            ptPos.setAttribute("cy", p1.y);
+            ptPos.className.baseVal = `point-intersection ${signClass}`;
+
+            // x축 위의 점
+            ptAxisPos.setAttribute("cx", axis1.x);
+            ptAxisPos.setAttribute("cy", axis1.y);
+
+            // 점선
+            if (!isZero) {
+                dashPos.setAttribute("d", `M${p1.x},${p1.y} L${p1.x},${axis1.y}`);
+                dashPos.style.opacity = 1;
+            } else {
+                dashPos.style.opacity = 0; // a=0이면 점선 불필요
+            }
+
+            // 라벨 (MathJax)
+            labelRootPos.style.opacity = 1;
+            labelRootPos.style.left = `${axis1.x}px`;
+
+            if (isZero) {
+                // a=0일 때: 0 표시
+                labelRootPos.innerHTML = `\\(0\\)`;
+                labelRootPos.style.top = `${axis1.y + 22}px`;
+                labelRootPos.style.color = lineColor;
+            } else {
+                // 일반 경우: n제곱근 표시
+                const rootExpr = n === 2 ? `\\sqrt{a}` : `\\sqrt[${n}]{a}`;
+                const sign = (!isEven && a < 0) ? `-` : ``;
+                labelRootPos.innerHTML = `\\(${sign}${rootExpr}\\)`;
+                labelRootPos.style.top = `${axis1.y + (a >= 0 ? 22 : -18)}px`;
+                labelRootPos.style.color = 'var(--text-color)';
+            }
+            MathJax.typesetPromise([labelRootPos]);
+
+            // 짝수이고 a>0일 때: 음수 방향 교점
+            if (isEven && a > 0 && !isZero) {
+                let p2 = toPx(-xVal, a);
+                let axis2 = toPx(-xVal, 0);
+
+                groupNeg.style.opacity = 1;
+
+                ptNeg.setAttribute("cx", p2.x);
+                ptNeg.setAttribute("cy", p2.y);
+                ptNeg.className.baseVal = `point-intersection ${signClass}`;
+
+                ptAxisNeg.setAttribute("cx", axis2.x);
+                ptAxisNeg.setAttribute("cy", axis2.y);
+
+                dashNeg.setAttribute("d", `M${p2.x},${p2.y} L${p2.x},${axis2.y}`);
+                dashNeg.style.opacity = 1;
+
+                labelRootNeg.style.opacity = 1;
+                labelRootNeg.style.left = `${axis2.x}px`;
+                labelRootNeg.style.top = `${axis2.y + 22}px`;
+                labelRootNeg.style.color = 'var(--text-color)';
+
+                const rootExpr = n === 2 ? `\\sqrt{a}` : `\\sqrt[${n}]{a}`;
+                labelRootNeg.innerHTML = `\\(-${rootExpr}\\)`;
+                MathJax.typesetPromise([labelRootNeg]);
+            } else {
+                groupNeg.style.opacity = 0;
+                labelRootNeg.style.opacity = 0;
+            }
+        }
+    </script>
+
+    <!-- KaTeX auto-render: 필기 영역과 범례만 -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // 필기 영역
+            const noteSection = document.querySelector('.note-section');
+            if (noteSection) {
+                renderMathInElement(noteSection, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false }
+                    ],
+                    throwOnError: false
+                });
+            }
+
+            // 범례
+            const legend = document.querySelector('.legend');
+            if (legend) {
+                renderMathInElement(legend, {
+                    delimiters: [
+                        { left: '$', right: '$', display: false }
+                    ],
+                    throwOnError: false
+                });
+            }
+        });
+    </script>
+
+</body>
+
+</html>
